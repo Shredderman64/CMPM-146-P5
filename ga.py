@@ -340,15 +340,35 @@ class Individual_DE(object):
         return Individual_DE(g)
 
 
-Individual = Individual_Grid
+Individual = Individual_DE
 
 
 def generate_successors(population):
     results = []
     # STUDENT Design and implement this
     # Hint: Call generate_children() on some individuals and fill up results.
+    parents = []
+    for individual in population:
+        if individual.fitness() > 0 and len(individual.genome) > 0:
+            parents.append(individual)
+    
+    total_fitness = sum(i.fitness() for i in parents)
+    rel_weights = [(i.fitness() / total_fitness) for i in parents]
+    cum_weights = [sum(rel_weights[:i+1]) for i in range(len(rel_weights))]
+
+    for num in range(50):
+        p1 = roulette_wheel(parents, cum_weights)
+        p2 = random.choice(parents)
+
+        c1, c2 = p1.generate_children(p2)
+        results.extend([c1, c2])
     return results
 
+def roulette_wheel(population, cum_weights):
+    rand = random.random()
+    for i, cp in enumerate(cum_weights):
+        if rand <= cp:
+            return population[i]
 
 def ga():
     # STUDENT Feel free to play with this parameter
@@ -390,6 +410,8 @@ def ga():
                 generation += 1
                 # STUDENT Determine stopping condition
                 stop_condition = False
+                if generation >= 50:
+                    stop_condition = True
                 if stop_condition:
                     break
                 # STUDENT Also consider using FI-2POP as in the Sorenson & Pasquier paper
