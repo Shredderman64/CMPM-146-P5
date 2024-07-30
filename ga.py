@@ -40,6 +40,7 @@ class Individual_Grid(object):
     # This can be expensive so we do it once and then cache the result.
     def calculate_fitness(self):
         measurements = metrics.metrics(self.to_level())
+        print(measurements)
         # Print out the possible measurements or look at the implementation of metrics.py for other keys:
         # print(measurements.keys())
         # Default fitness function: Just some arbitrary combination of a few criteria.  Is it good?  Who knows?
@@ -68,27 +69,78 @@ class Individual_Grid(object):
         # STUDENT also consider weighting the different tile types so it's not uniformly random
         # STUDENT consider putting more constraints on this to prevent pipes in the air, etc
 
+        #mutate tile, and then decide whether to keep the change or not keep the change
+        #random choice mutation
+        #how do we choose particular tiles?
+        #go with assumption that everything is up to chance
+        #you don't even have to have all the assets in the level!
+
         left = 1
         right = width - 1
+
+        types = ['-', '?', 'o', 'B', 'M', 'E']
         for y in range(height):
             for x in range(left, right):
+                #1 in 10 chance to mutate - but determining the fitness is the big important part
+                if random.randint(1,10) == 5 and y != height-1:
+                    #1. Choose a random mutation AKA - change it to something else
+                    #   options: -, X, ?, o, B, M
+                    generated = types[random.randint(0, len(types)-1)] #Easier not to hardcode in case we want to remove some types
+                    print("generating...")
+
+                    #2. Decide whether the random mutation is better or worse. How do we want to do this? Maybe just leave it for now and see what happens
+                    score = 10
+
+                    #Enemy check: generate them only on the ground floor
+                    if generated == 'E' and y < height-1:
+                        score -= 1
+
+                    #Too high; cutoff 
+                    if generated in ['?', 'o', 'B', 'M'] and y < height/2:
+                        #Determine if the tile is reachable: scan the 6 tiles that are 2/3 below and 1-3 across.
+                        reachable = False
+                        # for 
+                        if not reachable:
+                            score-=1
+                    #Too low; cutoff
+                    if generated in ['?', 'B', 'M'] and y > height-4:
+                        score -= 1
+                    #Unable to break a question mark block
+                    if y > 3 and generated in ['?', 'M'] and (genome[y-1] in ['?', 'B', 'M'] or genome[y-2] in ['?', 'B', 'M']):
+                        score -= 1
+                    if score >= 10: #Make it the tile
+                        genome[y][x] = generated
                 pass
         return genome
 
     # Create zero or more children from self and other
     def generate_children(self, other):
         new_genome = copy.deepcopy(self.genome)
+        second_genome = copy.deepcopy(other.genome)
         # Leaving first and last columns alone...
         # do crossover with other
         left = 1
         right = width - 1
+        # single_point = random.randint(left+10, right-10)
         for y in range(height):
             for x in range(left, right):
-                # STUDENT Which one should you take?  Self, or other?  Why?
+                #pick which one to take. Let's do uniform point selection for now
+                tile = other.genome[y][x]
+                if new_genome[y][x] != tile and random.randint(0,1) == 1:
+                    print(f"Original: {new_genome[y][x]}")
+                    second_genome[y][x] = new_genome[y][x]
+                    new_genome[y][x] = tile
+                    print(f"New: {tile}")
+
+                #Actually, changing it to single point selection, because it creates a more coherent structure.
+                # if x > single_point:
+                #     new_genome[y][x] = other.genome[y][x]
+
                 # STUDENT consider putting more constraints on this to prevent pipes in the air, etc
+                #   (deal with this in the mutation?)
                 pass
-        # do mutation; note we're returning a one-element tuple here
-        return (Individual_Grid(new_genome),)
+        # do mutation; note we're returning a one-element tuple here [I changed it to 2, is that fine???? It's just two mutations of the same genome, but they should be different.]
+        return (Individual_Grid(self.mutate(new_genome)), Individual_Grid(self.mutate(second_genome)))
 
     # Turn the genome into a level string (easy for this genome)
     def to_level(self):
@@ -169,6 +221,10 @@ class Individual_DE(object):
         # STUDENT For example, too many stairs are unaesthetic.  Let's penalize that
         if len(list(filter(lambda de: de[1] == "6_stairs", self.genome))) > 5:
             penalties -= 2
+            
+        #more negative space is bad. Penalize that
+        print("Measurements:", measurements)
+
         # STUDENT If you go for the FI-2POP extra credit, you can put constraint calculation in here too and cache it in a new entry in __slots__.
         self._fitness = sum(map(lambda m: coefficients[m] * measurements[m],
                                 coefficients)) + penalties
@@ -261,6 +317,7 @@ class Individual_DE(object):
 
     def generate_children(self, other):
         # STUDENT How does this work?  Explain it in your writeup.
+        print("Here")
         pa = random.randint(0, len(self.genome) - 1)
         pb = random.randint(0, len(other.genome) - 1)
         a_part = self.genome[:pa] if len(self.genome) > 0 else []
@@ -340,10 +397,11 @@ class Individual_DE(object):
         return Individual_DE(g)
 
 
-Individual = Individual_DE
+Individual = Individual_Grid
 
 
 def generate_successors(population):
+    print("success")
     results = []
     # STUDENT Design and implement this
     # Hint: Call generate_children() on some individuals and fill up results.
@@ -360,11 +418,17 @@ def generate_successors(population):
         p1 = roulette_wheel(parents, cum_weights)
         p2 = random.choice(parents)
 
+        # if type(Individual) == Individual_DE:
         c1, c2 = p1.generate_children(p2)
         results.extend([c1, c2])
+        # elif type(Individual) == Individual_Grid:
+        #     c1 = p1.generate_children(p2) #Should this be returning 2?
+        #     results.extend([c1])
+
     return results
 
 def roulette_wheel(population, cum_weights):
+    print(f"Population: {population}")
     rand = random.random()
     for i, cp in enumerate(cum_weights):
         if rand <= cp:
@@ -372,7 +436,7 @@ def roulette_wheel(population, cum_weights):
 
 def ga():
     # STUDENT Feel free to play with this parameter
-    pop_limit = 480
+    pop_limit = 60
     # Code to parallelize some computations
     batches = os.cpu_count()
     if pop_limit % batches != 0:
