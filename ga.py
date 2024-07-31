@@ -40,14 +40,14 @@ class Individual_Grid(object):
     # This can be expensive so we do it once and then cache the result.
     def calculate_fitness(self):
         measurements = metrics.metrics(self.to_level())
-        print(measurements)
+        #print(measurements)
         # Print out the possible measurements or look at the implementation of metrics.py for other keys:
         # print(measurements.keys())
         # Default fitness function: Just some arbitrary combination of a few criteria.  Is it good?  Who knows?
         # STUDENT Modify this, and possibly add more metrics.  You can replace this with whatever code you like.
         coefficients = dict(
             meaningfulJumpVariance=0.5,
-            negativeSpace=0.6,
+            negativeSpace=-0.6,
             pathPercentage=0.5,
             emptyPercentage=0.6,
             linearity=-0.5,
@@ -86,7 +86,7 @@ class Individual_Grid(object):
                     #1. Choose a random mutation AKA - change it to something else
                     #   options: -, X, ?, o, B, M
                     generated = types[random.randint(0, len(types)-1)] #Easier not to hardcode in case we want to remove some types
-                    print("generating...")
+                    #print("generating...")
 
                     #2. Decide whether the random mutation is better or worse. How do we want to do this? Maybe just leave it for now and see what happens
                     score = 10
@@ -121,20 +121,20 @@ class Individual_Grid(object):
         # do crossover with other
         left = 1
         right = width - 1
-        # single_point = random.randint(left+10, right-10)
+        #single_point = random.randint(left+10, right-10)
         for y in range(height):
             for x in range(left, right):
                 #pick which one to take. Let's do uniform point selection for now
                 tile = other.genome[y][x]
                 if new_genome[y][x] != tile and random.randint(0,1) == 1:
-                    print(f"Original: {new_genome[y][x]}")
+                    #print(f"Original: {new_genome[y][x]}")
                     second_genome[y][x] = new_genome[y][x]
                     new_genome[y][x] = tile
-                    print(f"New: {tile}")
+                    #print(f"New: {tile}")
 
                 #Actually, changing it to single point selection, because it creates a more coherent structure.
-                # if x > single_point:
-                #     new_genome[y][x] = other.genome[y][x]
+                #if x > single_point:
+                    #new_genome[y][x] = other.genome[y][x]
 
                 # STUDENT consider putting more constraints on this to prevent pipes in the air, etc
                 #   (deal with this in the mutation?)
@@ -149,7 +149,7 @@ class Individual_Grid(object):
     # These both start with every floor tile filled with Xs
     # STUDENT Feel free to change these
     @classmethod
-    def empty_individual(cls):
+    def empty_individual(_cls):
         g = [["-" for col in range(width)] for row in range(height)]
         g[15][:] = ["X"] * width
         g[14][0] = "m"
@@ -158,10 +158,10 @@ class Individual_Grid(object):
             g[col][-1] = "f"
         for col in range(14, 16):
             g[col][-1] = "X"
-        return cls(g)
+        return Individual_Grid(g)
 
     @classmethod
-    def random_individual(cls):
+    def random_individual(_cls):
         # STUDENT consider putting more constraints on this to prevent pipes in the air, etc
         # STUDENT also consider weighting the different tile types so it's not uniformly random
         g = [random.choices(options, k=width) for row in range(height)]
@@ -170,7 +170,7 @@ class Individual_Grid(object):
         g[7][-1] = "v"
         g[8:14][-1] = ["f"] * 6
         g[14:16][-1] = ["X", "X"]
-        return cls(g)
+        return Individual_Grid(g)
 
 
 def offset_by_upto(val, variance, min=None, max=None):
@@ -223,7 +223,7 @@ class Individual_DE(object):
             penalties -= 2
             
         #more negative space is bad. Penalize that
-        print("Measurements:", measurements)
+        #print("Measurements:", measurements)
 
         # STUDENT If you go for the FI-2POP extra credit, you can put constraint calculation in here too and cache it in a new entry in __slots__.
         self._fitness = sum(map(lambda m: coefficients[m] * measurements[m],
@@ -317,7 +317,7 @@ class Individual_DE(object):
 
     def generate_children(self, other):
         # STUDENT How does this work?  Explain it in your writeup.
-        print("Here")
+        #print("Here")
         pa = random.randint(0, len(self.genome) - 1)
         pb = random.randint(0, len(other.genome) - 1)
         a_part = self.genome[:pa] if len(self.genome) > 0 else []
@@ -397,27 +397,26 @@ class Individual_DE(object):
         return Individual_DE(g)
 
 
-Individual = Individual_Grid
+Individual = Individual_DE
 
 
 def generate_successors(population):
-    print("success")
+    #print("success")
     results = []
     # STUDENT Design and implement this
     # Hint: Call generate_children() on some individuals and fill up results.
     parents = []
     for individual in population:
-        if individual.fitness() > 0 and len(individual.genome) > 0:
+        if len(individual.genome) > 0:
             parents.append(individual)
     
     total_fitness = sum(i.fitness() for i in parents)
     rel_weights = [(i.fitness() / total_fitness) for i in parents]
     cum_weights = [sum(rel_weights[:i+1]) for i in range(len(rel_weights))]
 
-    for num in range(50):
+    for num in range(200):
         p1 = roulette_wheel(parents, cum_weights)
-        p2 = random.choice(parents)
-
+        p2 = tournament(parents)
         # if type(Individual) == Individual_DE:
         c1, c2 = p1.generate_children(p2)
         results.extend([c1, c2])
@@ -428,11 +427,16 @@ def generate_successors(population):
     return results
 
 def roulette_wheel(population, cum_weights):
-    print(f"Population: {population}")
+    #print(f"Population: {population}")
     rand = random.random()
     for i, cp in enumerate(cum_weights):
         if rand <= cp:
             return population[i]
+
+def tournament(population):
+    parents = random.choices(population, k=5)
+    parents = sorted(parents, key=lambda i: i.fitness(), reverse=True)
+    return parents[0]
 
 def ga():
     # STUDENT Feel free to play with this parameter
