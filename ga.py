@@ -78,9 +78,16 @@ class Individual_Grid(object):
         left = 1
         right = width - 1
 
-        types = ['-', '?', 'o', 'B', 'M', 'E']
+        types = ['-', '?', 'o', 'B', 'M', 'E', 'T', '|']
         for y in range(height):
             for x in range(left, right):
+                if genome[y][x] == '-':
+                    continue
+                max_y = y + 2
+                if max_y >= height - 1:
+                    max_y = height - 2
+                if genome[max_y][x] in ['?', 'B', 'M', 'X', 'T']:
+                    genome[y][x] = '-'
                 #1 in 10 chance to mutate - but determining the fitness is the big important part
                 if random.randint(1,10) == 5 and y != height-1:
                     #1. Choose a random mutation AKA - change it to something else
@@ -92,16 +99,27 @@ class Individual_Grid(object):
                     score = 10
 
                     #Enemy check: generate them only on the ground floor
-                    if generated == 'E' and y < height-1:
+                    if generated == 'E' and y < height-2:
                         score -= 1
-
+                    
+                    if generated == 'T':
+                        for i in range(y, height):
+                            if genome[i][x] != '|':
+                                score -= 1
+                    if generated == '|':
+                        pipe_penalty = True
+                        for i in range(y, -1, -1):
+                            if genome[i][x] == 'T':
+                                pipe_penalty = False
+                                break
+                        if pipe_penalty:
+                            score -= 1
                     #Too high; cutoff 
-                    if generated in ['?', 'o', 'B', 'M'] and y < height/2:
+                    #if generated in ['?', 'o', 'B', 'M', 'X']:
                         #Determine if the tile is reachable: scan the 6 tiles that are 2/3 below and 1-3 across.
-                        reachable = False
-                        # for 
-                        if not reachable:
-                            score-=1
+                        #reachable = False
+                        #if not reachable:
+                            #score-=1
                     #Too low; cutoff
                     if generated in ['?', 'B', 'M'] and y > height-4:
                         score -= 1
@@ -164,7 +182,8 @@ class Individual_Grid(object):
     def random_individual(_cls):
         # STUDENT consider putting more constraints on this to prevent pipes in the air, etc
         # STUDENT also consider weighting the different tile types so it's not uniformly random
-        g = [random.choices(options, k=width) for row in range(height)]
+        tile_weights = [50, 10, 30, 10, 10, 20, 5, 5, 5]
+        g = [random.choices(options, weights=tile_weights, k=width) for row in range(height)]
         g[15][:] = ["X"] * width
         g[14][0] = "m"
         g[7][-1] = "v"
@@ -219,9 +238,15 @@ class Individual_DE(object):
         )
         penalties = 0
         # STUDENT For example, too many stairs are unaesthetic.  Let's penalize that
-        if len(list(filter(lambda de: de[1] == "6_stairs", self.genome))) > 5:
+        stairs = list(filter(lambda de: de[1] == "6_stairs", self.genome))
+        if len(stairs) > 5 or len(stairs) < 3:
             penalties -= 2
-            
+        if any(de[3] < 1 for de in stairs):
+            penalties -= 2
+        
+        holes = list(filter(lambda de: de[1] == "0_hole", self.genome))
+        if any(de[2] > 3 for de in holes):
+            penalties -= 2
         #more negative space is bad. Penalize that
         #print("Measurements:", measurements)
 
@@ -385,7 +410,7 @@ class Individual_DE(object):
         # STUDENT Maybe enhance this
         elt_count = random.randint(8, 128)
         g = [random.choice([
-            (random.randint(1, width - 2), "0_hole", random.randint(1, 8)),
+            (random.randint(1, width - 2), "0_hole", random.randint(1, 4)),
             (random.randint(1, width - 2), "1_platform", random.randint(1, 8), random.randint(0, height - 1), random.choice(["?", "X", "B"])),
             (random.randint(1, width - 2), "2_enemy"),
             (random.randint(1, width - 2), "3_coin", random.randint(0, height - 1)),
@@ -397,7 +422,7 @@ class Individual_DE(object):
         return Individual_DE(g)
 
 
-Individual = Individual_DE
+Individual = Individual_Grid
 
 
 def generate_successors(population):
@@ -410,13 +435,18 @@ def generate_successors(population):
         if len(individual.genome) > 0:
             parents.append(individual)
     
-    total_fitness = sum(i.fitness() for i in parents)
-    rel_weights = [(i.fitness() / total_fitness) for i in parents]
+    if type(Individual) == Individual_Grid:
+        gene_pool = population
+    else:
+        gene_pool = parents
+    
+    total_fitness = sum(i.fitness() for i in gene_pool)
+    rel_weights = [(i.fitness() / total_fitness) for i in gene_pool]
     cum_weights = [sum(rel_weights[:i+1]) for i in range(len(rel_weights))]
 
     for num in range(200):
-        p1 = roulette_wheel(parents, cum_weights)
-        p2 = tournament(parents)
+        p1 = tournament(gene_pool)
+        p2 = roulette_wheel(gene_pool, cum_weights)
         # if type(Individual) == Individual_DE:
         c1, c2 = p1.generate_children(p2)
         results.extend([c1, c2])
