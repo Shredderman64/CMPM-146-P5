@@ -239,6 +239,8 @@ class Individual_DE(object):
 
         def overlap(base_de, de):
             for e in base_de:
+                if e == de:
+                    continue
                 left_edge = e[0]
                 right_edge = e[0] + e[2]
                 if de[0] > left_edge and de[0] < right_edge:
@@ -252,14 +254,24 @@ class Individual_DE(object):
             penalties -= 2
         if any(de[3] < 1 for de in stairs):
             penalties -= 2
+        for flight in stairs:
+            if overlap(stairs, flight):
+                penalties -= 2
         
         holes = list(filter(lambda de: de[1] == "0_hole", self.genome))
-        if any(de[2] > 3 for de in holes):
+        if len(holes) > 4 or len(holes) < 3:
             penalties -= 2
         
         pipes = list(filter(lambda de: de[1] == "7_pipe", self.genome))
         for pipe in pipes:
             if overlap(stairs, pipe) or overlap(holes, pipe):
+                penalties -= 2
+        
+        platforms = list(filter(lambda de: de[1] == "1_platform", self.genome))
+        if len(platforms) < 10:
+            penalties -= 2
+        for platform in platforms:
+            if platform[2] <= 2:
                 penalties -= 2
 
         #more negative space is bad. Penalize that
@@ -425,7 +437,7 @@ class Individual_DE(object):
         # STUDENT Maybe enhance this
         elt_count = random.randint(8, 128)
         g = [random.choice([
-            (random.randint(1, width - 2), "0_hole", random.randint(1, 4)),
+            (random.randint(1, width - 2), "0_hole", random.randint(1, 8)),
             (random.randint(1, width - 2), "1_platform", random.randint(1, 8), random.randint(0, height - 1), random.choice(["?", "X", "B"])),
             (random.randint(1, width - 2), "2_enemy"),
             (random.randint(1, width - 2), "3_coin", random.randint(0, height - 1)),
