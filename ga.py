@@ -236,6 +236,15 @@ class Individual_DE(object):
             linearity=-0.5,
             solvability=2.0
         )
+
+        def overlap(base_de, de):
+            for e in base_de:
+                left_edge = e[0]
+                right_edge = e[0] + e[2]
+                if de[0] > left_edge and de[0] < right_edge:
+                    return True
+            return False
+        
         penalties = 0
         # STUDENT For example, too many stairs are unaesthetic.  Let's penalize that
         stairs = list(filter(lambda de: de[1] == "6_stairs", self.genome))
@@ -247,6 +256,12 @@ class Individual_DE(object):
         holes = list(filter(lambda de: de[1] == "0_hole", self.genome))
         if any(de[2] > 3 for de in holes):
             penalties -= 2
+        
+        pipes = list(filter(lambda de: de[1] == "7_pipe", self.genome))
+        for pipe in pipes:
+            if overlap(stairs, pipe) or overlap(holes, pipe):
+                penalties -= 2
+
         #more negative space is bad. Penalize that
         #print("Measurements:", measurements)
 
@@ -422,7 +437,7 @@ class Individual_DE(object):
         return Individual_DE(g)
 
 
-Individual = Individual_Grid
+Individual = Individual_DE
 
 
 def generate_successors(population):
