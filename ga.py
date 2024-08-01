@@ -267,7 +267,7 @@ class Individual_DE(object):
         #         penalties -= 2
         
         #Holes
-        #Too many holes, or not enough holes;
+        #Too many holes, or not enough holes; too large holes
         holes = list(filter(lambda de: de[1] == "0_hole", self.genome))
         # print(f"Number of holes: {len(holes)}")
         # if len(holes) > 6 or len(holes) < 2:
