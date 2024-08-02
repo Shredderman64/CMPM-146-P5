@@ -89,7 +89,7 @@ class Individual_Grid(object):
                 if genome[max_y][x] in ['?', 'B', 'M', 'X', 'T']:
                     genome[y][x] = '-'
                 #1 in 10 chance to mutate - but determining the fitness is the big important part
-                if random.randint(1,10) == 5 and y != height-1:
+                if random.randint(1,10) == 1 and y != height-1:
                     #1. Choose a random mutation AKA - change it to something else
                     #   options: -, X, ?, o, B, M
                     generated = types[random.randint(0, len(types)-1)] #Easier not to hardcode in case we want to remove some types
@@ -114,12 +114,6 @@ class Individual_Grid(object):
                                 break
                         if pipe_penalty:
                             score -= 1
-                    #Too high; cutoff 
-                    #if generated in ['?', 'o', 'B', 'M', 'X']:
-                        #Determine if the tile is reachable: scan the 6 tiles that are 2/3 below and 1-3 across.
-                        #reachable = False
-                        #if not reachable:
-                            #score-=1
                     #Too low; cutoff
                     if generated in ['?', 'B', 'M'] and y > height-4:
                         score -= 1
@@ -139,25 +133,15 @@ class Individual_Grid(object):
         # do crossover with other
         left = 1
         right = width - 1
-        #single_point = random.randint(left+10, right-10)
         for y in range(height):
             for x in range(left, right):
                 #pick which one to take. Let's do uniform point selection for now
                 tile = other.genome[y][x]
                 if new_genome[y][x] != tile and random.randint(0,1) == 1:
-                    #print(f"Original: {new_genome[y][x]}")
                     second_genome[y][x] = new_genome[y][x]
                     new_genome[y][x] = tile
-                    #print(f"New: {tile}")
-
-                #Actually, changing it to single point selection, because it creates a more coherent structure.
-                #if x > single_point:
-                    #new_genome[y][x] = other.genome[y][x]
-
-                # STUDENT consider putting more constraints on this to prevent pipes in the air, etc
-                #   (deal with this in the mutation?)
                 pass
-        # do mutation; note we're returning a one-element tuple here [I changed it to 2, is that fine???? It's just two mutations of the same genome, but they should be different.]
+        # do mutation; two different genome mutations for two children
         return (Individual_Grid(self.mutate(new_genome)), Individual_Grid(self.mutate(second_genome)))
 
     # Turn the genome into a level string (easy for this genome)
@@ -267,7 +251,7 @@ class Individual_DE(object):
         #         penalties -= 2
         
         #Holes
-        #Too many holes, or not enough holes;
+        #Too many holes, or not enough holes; too large holes
         holes = list(filter(lambda de: de[1] == "0_hole", self.genome))
         # print(f"Number of holes: {len(holes)}")
         # if len(holes) > 6 or len(holes) < 2:
