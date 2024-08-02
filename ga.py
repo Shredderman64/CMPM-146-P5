@@ -236,6 +236,7 @@ class Individual_DE(object):
             linearity=-0.5,
             solvability=2.0
         )
+        # print(measurements['negativeSpace'])
 
         def overlap(base_de, de):
             for e in base_de:
@@ -248,34 +249,50 @@ class Individual_DE(object):
             return False
         
         penalties = 0
+
+        #Too much negative space - bad! We want more stuff. But also, not too much.
+        if measurements['negativeSpace'] >= 0.1 or measurements['negativeSpace'] < 0.05:
+            penalties -= 3
+
+        #Stairs
         # STUDENT For example, too many stairs are unaesthetic.  Let's penalize that
         stairs = list(filter(lambda de: de[1] == "6_stairs", self.genome))
-        if len(stairs) > 5 or len(stairs) < 3:
+        # if len(stairs) > 5 or len(stairs) < 2:
+        if len(stairs) > 5:
             penalties -= 2
         if any(de[3] < 1 for de in stairs):
-            penalties -= 2
-        for flight in stairs:
-            if overlap(stairs, flight):
-                penalties -= 2
+            penalties -= 1
+        # for flight in stairs:
+        #     if overlap(stairs, flight):
+        #         penalties -= 2
         
+        #Holes
+        #Too many holes, or not enough holes;
         holes = list(filter(lambda de: de[1] == "0_hole", self.genome))
-        if len(holes) > 4 or len(holes) < 3:
-            penalties -= 2
-        
-        pipes = list(filter(lambda de: de[1] == "7_pipe", self.genome))
-        for pipe in pipes:
-            if overlap(stairs, pipe) or overlap(holes, pipe):
-                penalties -= 2
-        
-        platforms = list(filter(lambda de: de[1] == "1_platform", self.genome))
-        if len(platforms) < 10:
-            penalties -= 2
-        for platform in platforms:
-            if platform[2] <= 2:
+        # print(f"Number of holes: {len(holes)}")
+        # if len(holes) > 6 or len(holes) < 2:
+        #     penalties -= 2
+        for hole in holes:
+            if hole[2] >= 4:
                 penalties -= 2
 
-        #more negative space is bad. Penalize that
-        #print("Measurements:", measurements)
+        #Too few platforms, or too-short platforms
+        platforms = list(filter(lambda de: de[1] == "1_platform", self.genome))
+        if len(platforms) < 5:
+            penalties -= 2
+        # for platform in platforms:
+        #     if platform[2] <= 2:
+        #         penalties -= 2
+        
+        #Pipes
+        #Pipes overlap stairs or holes
+        pipes = list(filter(lambda de: de[1] == "7_pipe", self.genome))
+        # print(f"Number of pipes:{len(pipes)}")
+        for pipe in pipes:
+            if overlap(stairs, pipe) or overlap(holes, pipe) or overlap(platforms, pipe):
+                penalties -= 4
+            if pipe[2] > 3:
+                penalties -= 2
 
         # STUDENT If you go for the FI-2POP extra credit, you can put constraint calculation in here too and cache it in a new entry in __slots__.
         self._fitness = sum(map(lambda m: coefficients[m] * measurements[m],
@@ -290,7 +307,7 @@ class Individual_DE(object):
     def mutate(self, new_genome):
         # STUDENT How does this work?  Explain it in your writeup.
         # STUDENT consider putting more constraints on this, to prevent generating weird things
-        if random.random() < 0.1 and len(new_genome) > 0:
+        if random.random() < 0.5 and len(new_genome) > 0:
             to_change = random.randint(0, len(new_genome) - 1)
             de = new_genome[to_change]
             new_de = de
@@ -303,17 +320,17 @@ class Individual_DE(object):
                 if choice < 0.33:
                     x = offset_by_upto(x, width / 8, min=1, max=width - 2)
                 elif choice < 0.66:
-                    y = offset_by_upto(y, height / 2, min=0, max=height - 1)
+                    y = offset_by_upto(y, height / 2, min=0, max=height - 3)
                 else:
                     breakable = not de[3]
                 new_de = (x, de_type, y, breakable)
             elif de_type == "5_qblock":
                 y = de[2]
                 has_powerup = de[3]  # boolean
-                if choice < 0.33:
+                if choice < 0.50:
                     x = offset_by_upto(x, width / 8, min=1, max=width - 2)
-                elif choice < 0.66:
-                    y = offset_by_upto(y, height / 2, min=0, max=height - 1)
+                elif choice < 0.75:
+                    y = offset_by_upto(y, height / 2, min=0, max=height - 3)
                 else:
                     has_powerup = not de[3]
                 new_de = (x, de_type, y, has_powerup)
@@ -329,7 +346,17 @@ class Individual_DE(object):
                 if choice < 0.5:
                     x = offset_by_upto(x, width / 8, min=1, max=width - 2)
                 else:
-                    h = offset_by_upto(h, 2, min=2, max=height - 4)
+                    prev_de = new_genome[to_change - 1]
+                    if prev_de[1] == "1_platform":
+                        y_pos = prev_de[3]
+                    elif prev_de[1] != "2_enemy":
+                        y_pos = prev_de[2]
+                    else:
+                        y_pos = 2
+                    if h > y_pos:
+                        h = offset_by_upto(h, 2, min=y_pos, max=height - 4)
+                    else:
+                        h = offset_by_upto(h, 2, min=2, max=y_pos)
                 new_de = (x, de_type, h)
             elif de_type == "0_hole":
                 w = de[2]
@@ -341,9 +368,9 @@ class Individual_DE(object):
             elif de_type == "6_stairs":
                 h = de[2]
                 dx = de[3]  # -1 or 1
-                if choice < 0.33:
+                if choice < 0.40:
                     x = offset_by_upto(x, width / 8, min=1, max=width - 2)
-                elif choice < 0.66:
+                elif choice < 0.80:
                     h = offset_by_upto(h, 8, min=1, max=height - 4)
                 else:
                     dx = -dx
@@ -357,7 +384,7 @@ class Individual_DE(object):
                 elif choice < 0.5:
                     w = offset_by_upto(w, 8, min=1, max=width - 2)
                 elif choice < 0.75:
-                    y = offset_by_upto(y, height, min=0, max=height - 1)
+                    y = offset_by_upto(y, height, min=0, max=height - 3)
                 else:
                     madeof = random.choice(["?", "X", "B"])
                 new_de = (x, de_type, w, y, madeof)
